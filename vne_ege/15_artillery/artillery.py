@@ -19,7 +19,10 @@ class Game:
     def __init__(self, initial_balls_number):
         self.initial_balls_number = initial_balls_number
         self.balls = []  # список объектов типа Ball
-        self.tank = Tank(canvas_width//2, canvas_height, "darkgreen")
+        self.terrain = Terrain()
+        tank_x = randint(Tank.turret_radius, canvas_width - Tank.turret_radius)
+        tank_y = canvas_height - self.terrain.heights[tank_x]
+        self.tank = Tank(tank_x, tank_y, "darkgreen")
         self.missiles = []
 
         self.t = 0
@@ -93,6 +96,31 @@ class Game:
             missile.delete()
         self.tank.delete()
         print("Конец игры!")
+
+
+class Terrain:
+    color = "brown"
+    period = 200
+    max_height = 250
+    amplitude = 30
+
+    def __init__(self):
+        self.heights = [None]*canvas_width
+        self.lines = [None]*canvas_width
+        for x in range(canvas_width):
+            height = Terrain.max_height - Terrain.amplitude + \
+                    Terrain.amplitude*math.sin(x*math.pi/Terrain.period)
+            line = canvas.create_line(x, canvas_height - height,
+                                      x, canvas_height,
+                                      width=1, fill=Terrain.color)
+            self.heights[x] = height
+            self.lines[x] = line
+
+    def update(self):
+        for x in range(canvas_width):
+            avatar = self.lines[x]
+            canvas.coords(avatar, x, canvas_height - self.heights[x],
+                          x, canvas_height)
 
 
 class Ball:
