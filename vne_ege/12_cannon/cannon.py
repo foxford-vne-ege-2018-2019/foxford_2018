@@ -36,7 +36,7 @@ class Game:
 
     def step(self):
         # доступ к флажку контроллера нужен для передачи ему информации, что игра кончилась:
-        global game_began
+        global allow_input
 
         # рассчёт полёта каждого шарика:
         for ball in self.balls:
@@ -221,7 +221,7 @@ class Tank:
 
 # --------- GAME CONTROLLER: ----------
 # Режим игры - игра идёт или нет
-game_began = False
+allow_input = False
 sleep_time = 50  # ms
 scores = 0
 
@@ -229,36 +229,36 @@ scores = 0
 def tick():
     time_label.after(sleep_time, tick)
     time_label['text'] = time.strftime('%H:%M:%S')
-    if game_began:
+    if allow_input:
         game.step()
 
 
 def button_start_game_handler():
-    global game_began
+    global allow_input
     if not game_began:
         game.start()
         game_began = True
 
 
 def button_stop_game_handler():
-    global game_began
+    global allow_input
     if game_began:
         game.stop()
         game_began = False
 
 
 def mouse_click_handler(event):
-    if game_began:
+    if allow_input:
         game.click(event.x, event.y)
 
 
 def mouse_release_handler(event):
-    if game_began:
+    if allow_input:
         game.release(event.x, event.y)
 
 
 def mouse_motion_handler(event):
-    if game_began:
+    if allow_input:
         game.mouse_motion(event.x, event.y)
 
 

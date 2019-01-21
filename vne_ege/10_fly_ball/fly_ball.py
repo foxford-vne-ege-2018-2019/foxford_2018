@@ -4,7 +4,7 @@ from random import randint
 
 # --------- GAME CONTROLLER: ----------
 # Режим игры - игра идёт или нет
-game_began = False
+allow_input = False
 sleep_time = 50  # ms
 scores = 0
 
@@ -12,19 +12,19 @@ scores = 0
 def tick():
     time_label.after(sleep_time, tick)
     time_label['text'] = time.strftime('%H:%M:%S')
-    if game_began:
+    if allow_input:
         game_step()
 
 
 def button_start_game_handler():
-    global game_began
+    global allow_input
     if not game_began:
         game_start()
         game_began = True
 
 
 def button_stop_game_handler():
-    global game_began
+    global allow_input
     if game_began:
         game_stop()
         game_began = False

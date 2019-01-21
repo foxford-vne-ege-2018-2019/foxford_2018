@@ -12,6 +12,7 @@ max_fire_energy = 200  # максимальное количество усло�
 max_click_time = 2  # максимальное количество секунд для набора энергии выстрела
 default_ball_color = "yellow"
 missile_color = "red"
+global_tanks_number = 2
 
 
 # --------- GAME MODEL: ----------
@@ -20,10 +21,15 @@ class Game:
         self.initial_balls_number = initial_balls_number
         self.balls = []  # список объектов типа Ball
         self.terrain = Terrain()
-        tank_x = randint(Tank.turret_radius, canvas_width - Tank.turret_radius)
-        tank_y = canvas_height - self.terrain.heights[tank_x]
-        self.tank = Tank(tank_x, tank_y, "darkgreen")
+        self.tanks = []
+        for i in range(global_tanks_number):
+            tank_x = randint(Tank.turret_radius, canvas_width - Tank.turret_radius)
+            tank_y = canvas_height - self.terrain.heights[tank_x]
+            tank = Tank(tank_x, tank_y, "darkgreen")
+            self.tanks.append(tank)
+        self.current_tank_index = 0
         self.missiles = []
+        self.mode = 0  # установка режима прицеливания в начале игры
 
         self.t = 0
         self.dt = 0.05  # Квант модельного (рассчётного) времени.
@@ -41,33 +47,32 @@ class Game:
 
     def step(self):
         # доступ к флажку контроллера нужен для передачи ему информации, что игра кончилась:
-        global game_began
+        global allow_input
+        if self.mode == 1:  # 1 -- режим полёта ракеты/снаряда
+            if self.missiles:
+                # рассчёт полёта каждого снаряда:
+                for missile in self.missiles:
+                    missile.step(self.dt)
 
-        # рассчёт полёта каждого шарика:
-        for ball in self.balls:
-            ball.step(self.dt)
-        # рассчёт полёта каждого шарика:
-        for missile in self.missiles:
-            missile.step(self.dt)
-        # рассчёт столкновений шариков:
-        for i in range(len(self.balls)):
-            for k in range(i+1, len(self.balls)):
-                if self.balls[i].intersect(self.balls[k]):
-                    self.balls[i].collide(self.balls[k])
-        # Удаляем шарики, которые коснулись снаряда
-        for k in range(len(self.missiles)-1, -1, -1):
-            for i in range(len(self.balls)-1, -1, -1):
-                if self.missiles[k].intersect(self.balls[i]):
-                    print("Поражение!")
-                    self.balls[i].delete()
-                    self.balls.pop(i)
-                    self.missiles[k].delete()
-                    self.missiles.pop(k)
-                    break
+                # TODO: уничтожать из списка ракеты, которые разбились о танк
+                # Удаляем снаряды, которые коснулись земли или танка
+                for k in range(len(self.missiles) - 1, -1, -1):
+                    x = self.missiles[k].x
+                    y = self.missiles[k].y
+                    if y >= canvas_height - self.terrain.heights[x]:
+                        print("Снаряд коснулся земли!")
+                        self.missiles[k].delete()
+                        self.missiles.pop(k)
+                        break
+            else:
+                print("переход в режим прицеливания")
+                self.mode = 0  # переход в режим прицеливания
+                allow_input = True  # отмена блокировки прицеливания
+
         # Определяем факт конца игры (раунда):
-        if not self.balls:
-            self.game_over()
-            game_began = False
+        # if ???:
+        #    self.game_over()
+        #    allow_input = False
         self.t += self.dt
 
     def click(self, x, y):
@@ -78,23 +83,27 @@ class Game:
     def release(self, x, y):
         """ Подготовка к выстрелу танка.
         """
+        global allow_input
         delta_t = time.time() - self._click_time
         energy = max_fire_energy * (1 if delta_t > max_click_time else delta_t / max_click_time)
 
-        self.tank.aim(x, y)
-        missile = self.tank.fire(energy)
+        self.tanks[self.current_tank_index].aim(x, y)
+        missile = self.tanks[self.current_tank_index].fire(energy)
+        self.current_tank_index = (self.current_tank_index + 1) % global_tanks_number
+        allow_input = False  # блокируем ввод на время полёта ракеты
         self.missiles.append(missile)
 
     def mouse_motion(self, x, y):
         """ При движении мышкой вызываем для танка (пока что единственного) его алгоритм прицеливания """
-        self.tank.aim(x, y)
+        self.tanks[self.current_tank_index].aim(x, y)
 
     def game_over(self):
         for ball in self.balls:
             ball.delete()
         for missile in self.missiles:
             missile.delete()
-        self.tank.delete()
+        for tank in self.tanks:
+            tank.delete()
         print("Конец игры!")
 
 
@@ -105,8 +114,8 @@ class Terrain:
     amplitude = 30
 
     def __init__(self):
-        self.heights = [None]*canvas_width
-        self.lines = [None]*canvas_width
+        self.heights = [0]*canvas_width
+        self.lines = [0]*canvas_width
         for x in range(canvas_width):
             height = Terrain.max_height - Terrain.amplitude + \
                     Terrain.amplitude*math.sin(x*math.pi/Terrain.period)
@@ -127,7 +136,7 @@ class Ball:
     density = 1.0  # стандартная плотность
 
     def __init__(self, color):
-        self.r = randint(20, 50)
+        self.r = randint(5, 20)
         self.m = self.density * math.pi * self.r ** 2  # Масса пропорциональна площади, т.е. квадрату радиуса.
         self.x = randint(0 + self.r, canvas_width - self.r)
         self.y = randint(0 + self.r, canvas_height - self.r)
@@ -245,13 +254,13 @@ class Tank:
         """ удаляет аватары танка с холста"""
         canvas.delete(self.gun_avatar)
         self.gun_avatar = None
-        canvas.delete(self.turret_avatar)
-        self.turret_avatar = None
+        canvas.delete(self.tank_avatar)
+        self.tank_avatar = None
 
 
 # --------- GAME CONTROLLER: ----------
 # Режим игры - игра идёт или нет
-game_began = False
+allow_input = False
 sleep_time = 50  # ms
 scores = 0
 
@@ -259,36 +268,36 @@ scores = 0
 def tick():
     time_label.after(sleep_time, tick)
     time_label['text'] = time.strftime('%H:%M:%S')
-    if game_began:
+    if allow_input:
         game.step()
 
 
 def button_start_game_handler():
-    global game_began
-    if not game_began:
+    global allow_input
+    if not allow_input:
         game.start()
-        game_began = True
+        allow_input = True
 
 
 def button_stop_game_handler():
-    global game_began
-    if game_began:
+    global allow_input
+    if allow_input:
         game.stop()
-        game_began = False
+        allow_input = False
 
 
 def mouse_click_handler(event):
-    if game_began:
+    if allow_input:
         game.click(event.x, event.y)
 
 
 def mouse_release_handler(event):
-    if game_began:
+    if allow_input:
         game.release(event.x, event.y)
 
 
 def mouse_motion_handler(event):
-    if game_began:
+    if allow_input:
         game.mouse_motion(event.x, event.y)
 
 
